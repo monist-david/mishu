@@ -25,7 +25,7 @@ class HomeView(TemplateView):
 
         # 初次建立连接, 随后方可修改cookie
         driver.get('http://www.taobao.com')
-        # 删除第一次登录是储存到本地的cookie
+        # # 删除第一次登录是储存到本地的cookie
         driver.delete_all_cookies()
         # 读取登录时储存到本地的cookie
         with open("C:/Users/david/Desktop/site/django site/mishu/search/cookies_tao.json", "r", encoding="utf8") as fp:
@@ -42,7 +42,7 @@ class HomeView(TemplateView):
 
         # 再次访问页面，便可实现免登陆访问
         driver.get("http://www.taobao.com")
-        time.sleep(3)
+        # time.sleep(3)
         wait = WebDriverWait(driver, 20)
         # 需要用手机淘宝扫二维码登录才能搜索
         print("正在查找", keyword)
@@ -80,6 +80,7 @@ class HomeView(TemplateView):
                     'location': item.find('.location').text(),
                     'url': item.find('.pic a').attr('href')
                 }
+                print(str(goods['url']))
                 driver.execute_script("window.open('" + str(goods['url']) + "')")
                 sreach_windows = driver.current_window_handle
                 all_handles = driver.window_handles
@@ -121,6 +122,7 @@ class HomeView(TemplateView):
     def next_page(self, page_number, wait, driver):
         print("正在换页", page_number)
         try:
+            self.get_goods(wait, driver)
             input = wait.until(
                 EC.presence_of_element_located((By.CSS_SELECTOR, "#mainsrp-pager > div > div > div > div.form > input"))
             )
@@ -136,7 +138,7 @@ class HomeView(TemplateView):
                                                          'div > div > ul > ' \
                                                          'li.item.active > ' \
                                                          'span'), str(page_number)))
-            self.get_goods(wait, driver)
+            print('pass')
         except Exception:
             self.next_page(page_number, wait, driver)
 
@@ -149,35 +151,28 @@ class HomeView(TemplateView):
             product_name = form.cleaned_data['product_name']
             # product_price_range_min = form.cleaned_data['product_price_range_min']
             # product_price_range_max = form.cleaned_data['product_price_range_max']
-            product_style = form.cleaned_data['product_style']
-            product_comment = form.cleaned_data['product_comment']
-            print(product_name)
-            # print(product_price_range_min)
-            # print(product_price_range_max)
-            print(product_style)
-            print(product_comment)
+            # product_style = form.cleaned_data['product_style']
+            product_functionality = form.cleaned_data['product_functionality']
 
-        # handles = driver.window_handles
-        # driver.switch_to.window(handles[-1])
+            keyword = product_name
+            demands = product_functionality
+            jieba.enable_paddle()
 
-        keyword = input('你要买的是什么商品？')
-        demands = input('你用这个商品做什么用？请尽量简洁。')
-        jieba.enable_paddle()
+            words = pseg.cut(demands, use_paddle=True)  # paddle模式
 
-        words = pseg.cut(demands, use_paddle=True)  # paddle模式
+            for word, flag in words:
+                if flag == 'v':
+                    keyword += word
+            print(keyword)
+            total = self.login_and_search(keyword)
+            total_1 = int(re.compile('(\d+)').search(total[0]).group(0))
+            for i in range(2, total_1 + 1):
+                if i % 15 == 0:
+                    time.sleep(20)
+                self.next_page(i, total[1], total[2])
 
-        for word, flag in words:
-            if flag == 'v':
-                keyword += word
-        total = self.login_and_search(keyword)
-        total_1 = int(re.compile('(\d+)').search(total[0]).group(0))
-        for i in range(2, total_1 + 1):
-            if i % 15 == 0:
-                time.sleep(20)
-            self.next_page(i, total[1], total[2])
+            # products = self.driver.find_elements_by_class_name('J_ItemPic img')
+            # for pro in products:
+            #     print(pro.text)
 
-        # products = self.driver.find_elements_by_class_name('J_ItemPic img')
-        # for pro in products:
-        #     print(pro.text)
-
-        return render(request, self.template_name)
+            return render(request, self.template_name)
